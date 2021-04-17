@@ -114,9 +114,14 @@ def publish(answer):
     T.start()
 
 
-def counterDoubleSpend(transaction):
+def counterDoubleSpend(dic, transaction):
     global global_chain_object
-    return -1*transaction['amount'] + global_chain_object.get_balance(transaction['sender_public_key']) + INTITIAL_BALANCE >= 0
+    if transaction['sender_public_key'] in dic:
+        dic[transaction['sender_public_key']] = dic[transaction['sender_public_key']] - 1*transaction['amount']
+    else: 
+        dic[transaction['sender_public_key']] = -1*transaction['amount'] + global_chain_object.get_balance(transaction['sender_public_key']) + INTITIAL_BALANCE
+        
+    return dic[transaction['sender_public_key']]>=0
 
 
 def worker():
@@ -131,10 +136,12 @@ def worker():
                 global_chain_object.transactions[0] = global_chain_object.transactions[1]
                 global_chain_object.transactions[1] = temp
 
+            dic={}
+
             problem1 = global_chain_object.transactions[0]
             global_chain_object.transactions = global_chain_object.transactions[1:]
 
-            if not counterDoubleSpend(problem1):
+            if not counterDoubleSpend(dic,problem1):
                 print("Insuficient balance")
                 Transaction.printIt(problem1)
                 continue
@@ -148,7 +155,7 @@ def worker():
             problem2 = global_chain_object.transactions[0]
             global_chain_object.transactions = global_chain_object.transactions[1:]
 
-            if not counterDoubleSpend(problem2):
+            if not counterDoubleSpend(dic,problem2):
                 print("Insuficient balance")
                 Transaction.printIt(problem2)
                 continue
