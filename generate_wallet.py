@@ -20,19 +20,17 @@ class Wallet:
         self.public_key = binascii.hexlify(
             public.exportKey(format='DER')).decode('ascii')
 
-        return self.private_key, self.public_key
-
     def get_keys(self):
 
-        private_key, public_key = self.generate_keys()
+        self.generate_keys()
 
         private = open(self.name + "_private.txt", "w")
         public = open(self.name + "_public.txt", "w")
 
-        private.write(private_key)
+        private.write(self.private_key)
         private.close()
 
-        public.write(public_key)
+        public.write(self.public_key)
         public.close()
 
     def import_key(self):
@@ -42,13 +40,14 @@ class Wallet:
 
         public = open(self.name + "_public.txt", "r")
         self.public_key = public.readline()
-    
-    def generate_recipient_key(self,name):
-        
+
+    def generate_recipient_key(self, name):
+
         public_key = open(name + "_public.txt", "r")
         recipient_public_key = public_key.readline()
-        
+
         return recipient_public_key
+
 
 if __name__ == "__main__":
     name = input("Enter Your name\n")

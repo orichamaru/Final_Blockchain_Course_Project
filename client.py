@@ -24,6 +24,13 @@ TRSANSACTION = 2
 INTITIAL_BALANCE = 50
 MYPORT = -1
 
+COMMISSION_RATE = 5/100  # percentage
+COMMISSION = Blockchain.COMMISSION
+
+TRANSACTION_PER_BLOCK = 2
+
+pub_key = None
+
 
 def sendData(port, message, type):
     global global_chain_object
@@ -106,8 +113,17 @@ def askChain(peer):
         print(e)
 
 
+def generateMinerWallet():
+    global pub_key
+
+    wallet = Wallet(str(MYPORT))
+    wallet.get_keys()
+
+    pub_key = wallet.public_key
+
+
 def publish(answer):
-    print("Solved Problem")
+    print("\nSolved Problem\n")
 
     T = threading.Thread(target=broadcast, args=(
         {'block': answer, 'port': MYPORT}, BLOCK,))
@@ -118,58 +134,77 @@ def publish(answer):
 def counterDoubleSpend(dic, transaction):
     global global_chain_object
     if transaction['sender_public_key'] in dic:
-        dic[transaction['sender_public_key']] = dic[transaction['sender_public_key']] - 1*transaction['amount']
-    else: 
-        dic[transaction['sender_public_key']] = -1*transaction['amount'] + global_chain_object.get_balance(transaction['sender_public_key']) + INTITIAL_BALANCE
+        dic[transaction['sender_public_key']] = dic[transaction['sender_public_key']
+                                                    ] - (1+COMMISSION_RATE)*transaction['amount']
+    else:
+        dic[transaction['sender_public_key']] = - (1+COMMISSION_RATE)*transaction['amount'] + \
+            global_chain_object.get_balance(
+                transaction['sender_public_key']) + INTITIAL_BALANCE
 
-    return dic[transaction['sender_public_key']]>=0
+    return dic[transaction['sender_public_key']] >= 0
+
+
+def compare(item):
+    return item['timestamp']
 
 
 def worker():
     global global_chain_object
     global thread
+    global pub_key
+
+    global_chain_object.transactions.sort(key=compare)
 
     while len(global_chain_object.transactions) >= 2 and (not global_chain_object.isStopped):
 
         with threading.Lock():
+            timestamp = time.time()
+            transactions = []
+            dic = {}
+            flag = True
+
             if(global_chain_object.transactions[0]['timestamp'] > global_chain_object.transactions[1]['timestamp']):
                 temp = global_chain_object.transactions[0]
                 global_chain_object.transactions[0] = global_chain_object.transactions[1]
                 global_chain_object.transactions[1] = temp
 
-            dic={}
+            for _ in range(TRANSACTION_PER_BLOCK):
+                problem = global_chain_object.transactions[0]
+                global_chain_object.transactions = global_chain_object.transactions[1:]
 
-            problem1 = global_chain_object.transactions[0]
-            global_chain_object.transactions = global_chain_object.transactions[1:]
+                new_transaction = Transaction(
+                    problem['amount'] * COMMISSION_RATE,  problem['sender_public_key'], pub_key, timestamp)
+                new_transaction.signature = COMMISSION
 
-            if not counterDoubleSpend(dic,problem1):
-                print("Insuficient balance")
-                Transaction.printIt(problem1)
-                continue
+                if not new_transaction.verifyIt(global_chain_object):
+                    print("\nError in Commission\n")
+                    Transaction.printIt(new_transaction)
+                    flag = False
+                    continue
 
-            if(problem1['timestamp'] < global_chain_object.maxTransactionTimeStamp):
-                print("timestamp is less then " +
-                      str(global_chain_object.maxTransactionTimeStamp))
-                Transaction.printIt(problem1)
-                continue
+                if not counterDoubleSpend(dic, problem):
+                    print("\nInsuficient balance\n")
+                    Transaction.printIt(problem)
+                    flag = False
+                    continue
 
-            problem2 = global_chain_object.transactions[0]
-            global_chain_object.transactions = global_chain_object.transactions[1:]
+                if(problem['timestamp'] < global_chain_object.maxTransactionTimeStamp):
+                    print("timestamp is less then " +
+                          str(global_chain_object.maxTransactionTimeStamp))
+                    Transaction.printIt(problem)
+                    flag = False
+                    break
 
-            if not counterDoubleSpend(dic,problem2):
-                print("Insuficient balance")
-                Transaction.printIt(problem2)
-                continue
+                transactions.append(problem)
+                transactions.append(new_transaction.get_transaction_bill())
 
-            if(problem2['timestamp'] < global_chain_object.maxTransactionTimeStamp):
-                print("timestamp is less then " +
-                      str(global_chain_object.maxTransactionTimeStamp))
-                Transaction.printIt(problem2)
-                continue
+        if flag == False:
+            continue
 
-        new_block = global_chain_object.mine([problem1, problem2], MYPORT)
+        new_block = global_chain_object.mine(transactions, MYPORT, timestamp)
 
-        # block checking or insertion shuld  otbe done parallely
+        # block verifyication and insertion shuld not be done parallely
+
         with threading.Lock():
             if global_chain_object.isStopped:
                 return
@@ -259,109 +294,121 @@ if firstPeer != -1:
     askPeers(firstPeer)
     askChain(firstPeer)
 
-print('Print 1 for transaction , 2 for last block, 3 for available transactions, 4 to get balance')
+generateMinerWallet()
+
+print('\nPrint 1 for transaction , 2 for last block, 3 for available transactions, 4 to get balance')
 
 RUN = True
 while RUN:
-    # try:
-    r, _, _ = select.select([server, 0], [], [], TIMEOUT)
+    try:
+        r, _, _ = select.select([server, 0], [], [], TIMEOUT)
 
-    for fd in r:
-        if fd == -1:
-            print("Something Goes Wrong")
-            RUN = False
-            break
+        for fd in r:
+            if fd == -1:
+                print("Something Goes Wrong")
+                RUN = False
+                break
 
-        if fd == 0:
-            x = int(input())
+            if fd == 0:
+                try:
+                    x = int(input())
 
-            # Transaction
-            if(x == 1):
-                timestamp = time.time()
+                    # Transaction
+                    if(x == 1):
+                        timestamp = time.time()
+
+                        sender_name = input(
+                            'Enter your name (Make sure your key pairs exists)\n')
+
+                        # Instantiating  Wallet and Fetching Credentials
+                        wallet = Wallet(sender_name)
+                        wallet.import_key()
+                        sender_public_key = wallet.public_key
+                        sender_private_key = wallet.private_key
+                        print('\nKeys successfully imported\n')
+
+                        amount = int(input('\nEnter amount\n'))
+
+                        recipient_name = input(
+                            '\nEnter recipient name (Make sure key pair exists)\n')
+                        recipient_public_key = wallet.generate_recipient_key(
+                            recipient_name)
+                        print('\n Recipient Address Successfully fetched \n')
+
+                        new_transaction = Transaction(
+                            amount, sender_public_key, recipient_public_key, timestamp)
+                        new_transaction.sign_transaction(sender_private_key)
+
+                        if handle_new_transaction(new_transaction):
+
+                            # broadcasting to all nodes
+                            broadcast(new_transaction, TRSANSACTION)
+
+                            print('\nTransaction Successfully Added and Broadcasted\n')
+                        else:
+                            print('\nWrong Transaction\n')
+
+                    # Get Last Block of Chain
+                    if(x == 2):
+                        print('\nLast Block of Chain is \n')
+                        global_chain_object.last_block_chain().printIt()
+
+                    # Available Transactions
+                    if(x == 3):
+                        if(len(global_chain_object.transactions) == 0):
+                            print('\nNo due transactions are left\n')
+                        else:
+                            for t in global_chain_object.transactions:
+                                Transaction.printIt(t)
+
+                    if x == 4:
+                        wallet = Wallet()
+                        name = input('\nEnter your name\n')
+                        public_key = wallet.generate_recipient_key(name)
+                        print(
+                            "\nBalance "+str(global_chain_object.get_balance(public_key) + INTITIAL_BALANCE)+'\n')
                 
-                sender_name = input('Enter your name (Make sure your key pairs exists)\n')
-               
-                #Instantiating  Wallet and Fetching Credentials
-                wallet = Wallet(sender_name)
-                wallet.import_key()
-                sender_public_key = wallet.public_key
-                sender_private_key = wallet.private_key
-                print('\nKeys successfully imported\n')
-               
-                amount = int(input('\nEnter amount\n'))
-               
-                recipient_name = input('\nEnter recipient name (Make sure key pair exists)\n') 
-                recipient_public_key = wallet.generate_recipient_key(recipient_name)
-                print('\n Recipient Address Successfully fetched \n')
+                except Exception as e:
+                    print(e)
 
-                new_transaction = Transaction(
-                    amount, sender_public_key, recipient_public_key, timestamp)
-                new_transaction.sign_transaction(sender_private_key)
+            else:
+                try:
+                    connection, client_address = server.accept()
 
-                if handle_new_transaction(new_transaction):
+                    data = recvall(connection)
+                    type, message = extractMessage(data)
 
-                    # broadcasting to all nodes
-                    broadcast(new_transaction, TRSANSACTION)
+                    if type == PEERREQUEST:
+                        dic = {"type": "none",
+                               "message": global_chain_object.peers}
+                        connection.send(pickle.dumps(dic))
 
-                    print('\nTransaction Successfully Added and Broadcasted\n')
-                else:
-                    print('\nWrong Transaction\n')
+                        if global_chain_object.addPeers(message):
+                            broadcast(message, NEWPEER)
 
-            # Get Last Block of Chain
-            if(x == 2):
-                print('\nLast Block of Chain is \n')
-                global_chain_object.last_block_chain().printIt()
+                    elif type == CHAINREQUEST:
+                        dic = {"type": "none",
+                               "message": global_chain_object.chain}
+                        connection.send(pickle.dumps(dic))
 
-            # Available Transactions
-            if(x == 3):
-                if(len(global_chain_object.transactions) == 0):
-                    print('\nNo due transactions are left\n')
-                else:
-                    for t in global_chain_object.transactions:
-                        Transaction.printIt(t)
+                    elif type == NEWPEER:
+                        global_chain_object.addPeers(message)
 
-            if x == 4:
-                wallet = Wallet()
-                name = input('\nEnter your name\n')
-                public_key = wallet.generate_recipient_key(name)
-                print(
-                    "Balance "+str(global_chain_object.get_balance(public_key) + INTITIAL_BALANCE)+'\n')
+                    elif type == TRSANSACTION:
+                        if handle_new_transaction(message):
+                            print(
+                                '\nRecieved new transaction... added to the pool\n')
 
-        else:
-            connection, client_address = server.accept()
+                    elif type == BLOCK:
+                        connection.close()  # its important
+                        handle_new_block(message['block'], message['port'])
 
-            data = recvall(connection)
-            type, message = extractMessage(data)
+                    connection.close()
+                except Exception as e:
+                    connection.close()
+                    print(e)
 
-            if type == PEERREQUEST:
-                dic = {"type": "none", "message": global_chain_object.peers}
-                connection.send(pickle.dumps(dic))
-
-                if global_chain_object.addPeers(message):
-                    broadcast(message, NEWPEER)
-
-            elif type == CHAINREQUEST:
-                dic = {"type": "none", "message": global_chain_object.chain}
-                connection.send(pickle.dumps(dic))
-
-            elif type == NEWPEER:
-                global_chain_object.addPeers(message)
-
-            elif type == TRSANSACTION:
-                if handle_new_transaction(message):
-                    print('Recieved new transaction... added to the pool')
-
-            elif type == BLOCK:
-                connection.close()  # its important
-                handle_new_block(message['block'], message['port'])
-
-            connection.close()
-            # except Exception as e:
-
-            #     connection.close()
-            #     print(e)
-
-    # except Exception as e:
-    #     server.close()
-    #     print(e)
-    #     RUN = False
+    except Exception as e:
+        server.close()
+        print(e)
+        RUN = False

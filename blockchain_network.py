@@ -5,12 +5,12 @@ import binascii
 import hashlib
 import json
 from block import Block
-import time
 
 DIFFICULTY = 5
 
 
 class Blockchain:
+    COMMISSION = 'commision'
 
     def __init__(self):
         self.peers = []
@@ -89,8 +89,9 @@ class Blockchain:
         sender_public_key = transaction['sender_public_key']
 
         # If any other check you want to perform -----------------
-        #Balance verification should be done prior
-        available_balance = self.get_balance(sender_public_key)
+
+        if digital_signature == self.COMMISSION:
+            return True
 
         if(self.verify_signature(sender_public_key, transaction, digital_signature)):
             return True
@@ -124,7 +125,7 @@ class Blockchain:
                 self.maxTransactionTimeStamp, t['timestamp'])
 
     # Mining of block
-    def mine(self, transactions, minerId):
+    def mine(self, transactions, minerId, timestamp):
 
         prev_block = self.last_block_chain()
         prev_hash = self.calculate_hash_of_block(prev_block)
@@ -139,7 +140,7 @@ class Blockchain:
         # new_block.transactions = self.get_reward(self.available_transactions)   ## need to implement
 
         new_block.transactions = transactions
-        new_block.timestamp = time.time()
+        new_block.timestamp = timestamp
 
         # Nounce is correctily calculated
         self.proof_of_work(new_block)

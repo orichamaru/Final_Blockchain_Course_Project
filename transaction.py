@@ -5,7 +5,6 @@ from Crypto.Hash import SHA
 import binascii
 import time
 
-
 # this class required to work on to make transactions more significant
 class Transaction:
 
