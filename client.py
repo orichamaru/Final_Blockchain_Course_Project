@@ -157,20 +157,20 @@ def worker():
 
     while len(global_chain_object.transactions) >= 2 and (not global_chain_object.isStopped):
 
+        toDrop = None
+
         with threading.Lock():
             timestamp = time.time()
             transactions = []
             dic = {}
-            flag = True
 
             if(global_chain_object.transactions[0]['timestamp'] > global_chain_object.transactions[1]['timestamp']):
                 temp = global_chain_object.transactions[0]
                 global_chain_object.transactions[0] = global_chain_object.transactions[1]
                 global_chain_object.transactions[1] = temp
 
-            for _ in range(TRANSACTION_PER_BLOCK):
-                problem = global_chain_object.transactions[0]
-                global_chain_object.transactions = global_chain_object.transactions[1:]
+            for i in range(TRANSACTION_PER_BLOCK):
+                problem = global_chain_object.transactions[i]
 
                 new_transaction = Transaction(
                     problem['amount'] * COMMISSION_RATE,  problem['sender_public_key'], pub_key, timestamp)
@@ -179,26 +179,33 @@ def worker():
                 if not new_transaction.verifyIt(global_chain_object):
                     print("\nError in Commission\n")
                     Transaction.printIt(new_transaction)
-                    flag = False
-                    continue
+                    toDrop = problem
+                    break
 
                 if not counterDoubleSpend(dic, problem):
                     print("\nInsuficient balance\n")
                     Transaction.printIt(problem)
-                    flag = False
-                    continue
+                    toDrop = problem
+                    break
 
                 if(problem['timestamp'] < global_chain_object.maxTransactionTimeStamp):
                     print("timestamp is less then " +
                           str(global_chain_object.maxTransactionTimeStamp))
                     Transaction.printIt(problem)
-                    flag = False
+                    toDrop = problem
                     break
 
                 transactions.append(problem)
                 transactions.append(new_transaction.get_transaction_bill())
 
-        if flag == False:
+            if toDrop != None:
+                global_chain_object.transactions.remove(toDrop)
+            else:
+                for k in transactions:
+                    if k in global_chain_object.transactions:
+                        global_chain_object.transactions.remove(k)
+
+        if toDrop != None:
             continue
 
         new_block = global_chain_object.mine(transactions, MYPORT, timestamp)
