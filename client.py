@@ -33,7 +33,7 @@ def sendData(port, message, type):
         clientSocket.send(pickle.dumps(dic))
         clientSocket.close()
     except Exception as e:
-        global_chain_object.removePeers(port)
+        global_chain_object.removePeer(port)
         print(e)
 
 
@@ -120,7 +120,7 @@ def counterDoubleSpend(dic, transaction):
         dic[transaction['sender_public_key']] = dic[transaction['sender_public_key']] - 1*transaction['amount']
     else: 
         dic[transaction['sender_public_key']] = -1*transaction['amount'] + global_chain_object.get_balance(transaction['sender_public_key']) + INTITIAL_BALANCE
-        
+
     return dic[transaction['sender_public_key']]>=0
 
 
