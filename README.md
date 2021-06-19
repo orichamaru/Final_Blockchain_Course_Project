@@ -16,7 +16,7 @@
 4. For now upon addition of 2 transaction in transaction book, everyone starts mining.
 
 
-![alt_text](https://tenor.com/view/baby-yoda-baby-yoda-happy-laughing-smile-happy-gif-16061896)
+![alt_text](https://media.giphy.com/media/j0eRJzyW7XjMpu1Pqd/giphy.gif)
 
 ### Steps for Generation Key Pair to become valid user of network 
 
@@ -38,7 +38,7 @@
 1. Run ''' python3 client.py ''' , enter your port number.
 2. For getting connected to network enter port number of any node which is connected in network.
 
-![alt_text](https://tenor.com/view/surprise-chris-pratt-parks-and-recreation-parks-and-rec-shocked-gif-5571450)
+![Alt Text](https://media.giphy.com/media/90F8aUepslB84/giphy.gif)
 
 ### Operations available 
 
@@ -48,7 +48,7 @@ After getting connected to network you will be prompted with following options
 3. Getting list of available transaction
 4. Getting information about your wallet
 
-![alt_text](https://tenor.com/view/im-ready-cat-sunglass-gif-13422464)
+![alt_text](https://media.giphy.com/media/l6Td5sKDNmDGU/giphy.gif)
 
 ### Steps for making transaction blockchain network
 
